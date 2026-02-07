@@ -135,7 +135,7 @@ def index():
                                 
                                 <div class="d-inline-block mb-4">
                                     <button id="likeBtn" class="btn btn-like rounded-pill px-4 py-2 fw-bold" onclick="sendLike()">
-                                        <i class="fa-solid fa-heart me-2"></i> Like 
+                                        <i class="fa-solid fa-heart me-2"></i> Likes 
                                         <span id="likeCount" class="badge bg-warning text-dark ms-2">Loading...</span>
                                     </button>
                                 </div>
