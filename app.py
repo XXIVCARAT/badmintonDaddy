@@ -5,7 +5,6 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     # 1. HARDCODED RANKINGS DATA
-    # Edit this list to add more friends or change scores
     standings_data = [
         {"rank": 1, "name": "Suhal++ Chong Wei", "points": 1250, "win_rate": "92%"},
         {"rank": 2, "name": "Sujay Dan", "points": 1180, "win_rate": "88%"},
@@ -13,11 +12,12 @@ def index():
         {"rank": 4, "name": "Generic Player 1", "points": 800, "win_rate": "50%"},
     ]
 
-    # Video file path (Make sure 'match_highlight.mp4' is inside a folder named 'static')
+    # Video file path
     video_url = url_for('static', filename='match_highlight.mp4')
 
-    # The HTML Template
-    html_content = f'''
+    # CHANGED: Removed 'f' from here. Now it is just a normal string.
+    # We use {{ video_url }} for Jinja to fill it in later.
+    html_content = '''
     <!doctype html>
     <html lang="en" data-bs-theme="dark">
       <head>
@@ -26,11 +26,11 @@ def index():
         <title>Badminton League</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
-            body {{ background-color: #1a1a1a; color: white; font-family: sans-serif; }}
-            .custom-header {{ color: #ffcc00; text-shadow: 1px 1px 5px black; }}
-            .nav-tabs .nav-link.active {{ background-color: #ffcc00; color: black; border-color: #ffcc00; font-weight: bold; }}
-            .nav-tabs .nav-link {{ color: #ffcc00; }}
-            .highlight-card {{ border: 2px solid #ffcc00; background-color: #2c2c2c; }}
+            body { background-color: #1a1a1a; color: white; font-family: sans-serif; }
+            .custom-header { color: #ffcc00; text-shadow: 1px 1px 5px black; }
+            .nav-tabs .nav-link.active { background-color: #ffcc00; color: black; border-color: #ffcc00; font-weight: bold; }
+            .nav-tabs .nav-link { color: #ffcc00; }
+            .highlight-card { border: 2px solid #ffcc00; background-color: #2c2c2c; }
         </style>
       </head>
       <body>
@@ -50,7 +50,6 @@ def index():
             <div class="tab-content" id="myTabContent">
                 
                 <div class="tab-pane fade show active" id="announcements" role="tabpanel">
-                    
                     <div class="alert alert-warning text-dark fw-bold fs-5" role="alert">
                         📢 Badminton Daddy wishes Ourab all the best for his GATE exam! 🎓
                     </div>
@@ -59,7 +58,7 @@ def index():
                         <h4 class="mb-3">🔥 Match of the Week 🔥</h4>
                         <div class="ratio ratio-16x9">
                             <video controls autoplay muted loop>
-                                <source src="{video_url}" type="video/mp4">
+                                <source src="{{ video_url }}" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
                         </div>
@@ -81,10 +80,10 @@ def index():
                             <tbody>
                                 {% for player in rankings %}
                                 <tr>
-                                    <th scope="row">{ "{{ player.rank }}" }</th>
-                                    <td>{ "{{ player.name }}" }</td>
-                                    <td>{ "{{ player.points }}" }</td>
-                                    <td>{ "{{ player.win_rate }}" }</td>
+                                    <th scope="row">{{ player.rank }}</th>
+                                    <td>{{ player.name }}</td>
+                                    <td>{{ player.points }}</td>
+                                    <td>{{ player.win_rate }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -94,13 +93,13 @@ def index():
 
             </div>
         </div>
-
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
       </body>
     </html>
     '''
     
-    return render_template_string(html_content, rankings=standings_data)
+    # CHANGED: We now pass video_url here
+    return render_template_string(html_content, rankings=standings_data, video_url=video_url)
 
 if __name__ == '__main__':
     app.run(debug=True)
