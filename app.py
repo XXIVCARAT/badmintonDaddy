@@ -1,11 +1,10 @@
 import os
-from flask import Flask, url_for, render_template_string, request, redirect
+from flask import Flask, url_for, render_template_string, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
 # --- DATABASE CONFIGURATION ---
-# Uses Render's DB if available, otherwise uses a local file 'local.db'
 db_url = os.environ.get('DATABASE_URL')
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -15,7 +14,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- DATABASE MODELS ---
+# --- MODELS ---
 class LikeCounter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     count = db.Column(db.Integer, default=0)
@@ -25,7 +24,7 @@ class Comment(db.Model):
     author = db.Column(db.String(50), nullable=False)
     text = db.Column(db.String(500), nullable=False)
 
-# Create tables and initialize counter
+# Init DB
 with app.app_context():
     db.create_all()
     if not LikeCounter.query.first():
@@ -34,7 +33,7 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    # 1. HARDCODED RANKINGS DATA
+    # 1. HARDCODED RANKINGS
     standings_data = [
         {"rank": 1, "name": "Ourab", "elo": 1500},
         {"rank": 2, "name": "Anuj", "elo": 1480},
@@ -49,17 +48,9 @@ def index():
         {"rank": 11, "name": "Ameya", "elo": 1250},
     ]
 
-    # 2. LOAD STATIC FILES
     gif_url = url_for('static', filename='my_cool_gif.gif')
 
-    # 3. FETCH DATABASE DATA
-    likes_obj = LikeCounter.query.first()
-    current_likes = likes_obj.count if likes_obj else 0
-    
-    # Get all comments (Newest first)
-    all_comments = Comment.query.order_by(Comment.id.desc()).all()
-
-    # HTML TEMPLATE
+    # HTML TEMPLATE WITH JAVASCRIPT
     html_content = '''
     <!doctype html>
     <html lang="en" data-bs-theme="dark">
@@ -73,22 +64,13 @@ def index():
         <style>
             body { background-color: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
             .custom-header { color: #ffcc00; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
-            
-            /* Tab Styling */
             .nav-tabs .nav-link.active { background-color: #ffcc00; color: black; border-color: #ffcc00; font-weight: bold; }
             .nav-tabs .nav-link { color: #ffcc00; margin-right: 5px; border: 1px solid #333; }
             .nav-tabs { border-bottom: 2px solid #ffcc00; }
-            
-            /* Table Styling */
-            .table-custom { border: 1px solid #444; }
-            .rank-col { color: #ffcc00; font-weight: bold; font-size: 1.2em; }
-            
-            /* Announcement Styling */
             .wish-card { border: 4px solid #ffcc00; background-color: #2c2c2c; border-radius: 20px; box-shadow: 0 0 20px rgba(255, 204, 0, 0.3); }
             .wish-text { font-size: 2rem; color: #fff; font-weight: bold; line-height: 1.4; }
             .highlight-name { color: #ffcc00; text-decoration: underline; }
             
-            /* Comment & Like Styling */
             .interaction-section { border-top: 1px solid #555; padding-top: 20px; margin-top: 20px; }
             .btn-like { border: 2px solid #ffcc00; color: #ffcc00; background: transparent; transition: 0.3s; }
             .btn-like:hover { background-color: #ffcc00; color: black; }
@@ -137,7 +119,6 @@ def index():
                 
                 <div class="tab-pane fade" id="announcements" role="tabpanel">
                     <div class="container" style="max-width: 700px;">
-                        
                         <div class="card wish-card p-4 mb-4">
                             <p class="wish-text">
                                 Badminton Daddy wishes <br>
@@ -152,58 +133,128 @@ def index():
 
                             <div class="interaction-section">
                                 
-                                <form action="/like" method="POST" class="d-inline-block mb-4">
-                                    <button type="submit" class="btn btn-like rounded-pill px-4 py-2 fw-bold">
+                                <div class="d-inline-block mb-4">
+                                    <button id="likeBtn" class="btn btn-like rounded-pill px-4 py-2 fw-bold" onclick="sendLike()">
                                         <i class="fa-solid fa-heart me-2"></i> Like 
-                                        <span class="badge bg-warning text-dark ms-2">{{ likes }}</span>
+                                        <span id="likeCount" class="badge bg-warning text-dark ms-2">Loading...</span>
                                     </button>
-                                </form>
+                                </div>
 
                                 <div class="text-start">
                                     <h5 class="text-white border-bottom pb-2 mb-3">Leave a Wish</h5>
-                                    <form action="/comment" method="POST" class="row g-2 mb-4">
+                                    <form id="commentForm" onsubmit="sendComment(event)" class="row g-2 mb-4">
                                         <div class="col-4">
-                                            <input type="text" name="author" class="form-control bg-dark text-white border-secondary" placeholder="Your Name" required>
+                                            <input type="text" id="author" class="form-control bg-dark text-white border-secondary" placeholder="Your Name" required>
                                         </div>
                                         <div class="col-6">
-                                            <input type="text" name="comment_text" class="form-control bg-dark text-white border-secondary" placeholder="Write something nice..." required>
+                                            <input type="text" id="commentText" class="form-control bg-dark text-white border-secondary" placeholder="Write something nice..." required>
                                         </div>
                                         <div class="col-2">
                                             <button type="submit" class="btn btn-warning w-100 fw-bold">Post</button>
                                         </div>
                                     </form>
 
-                                    <div class="comments-list" style="max-height: 400px; overflow-y: auto;">
-                                        {% if comments|length == 0 %}
-                                            <p class="text-muted fst-italic">No comments yet. Be the first!</p>
-                                        {% else %}
-                                            {% for comment in comments %}
-                                            <div class="comment-box">
-                                                <div class="comment-author">{{ comment.author }}</div>
-                                                <div class="text-light small">{{ comment.text }}</div>
-                                            </div>
-                                            {% endfor %}
-                                        {% endif %}
+                                    <div id="commentsList" class="comments-list" style="max-height: 400px; overflow-y: auto;">
+                                        <p class="text-muted fst-italic">Loading comments...</p>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
-
                     </div>
                 </div>
-
             </div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        
+        <script>
+            // --- 1. FUNCTION TO FETCH UPDATES (The Live Part) ---
+            function fetchUpdates() {
+                fetch('/api/updates')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update Like Count
+                        document.getElementById('likeCount').innerText = data.likes;
+                        
+                        // Update Comments List
+                        const commentsList = document.getElementById('commentsList');
+                        if (data.comments.length === 0) {
+                            commentsList.innerHTML = '<p class="text-muted fst-italic">No comments yet. Be the first!</p>';
+                        } else {
+                            let html = '';
+                            data.comments.forEach(comment => {
+                                html += `
+                                    <div class="comment-box">
+                                        <div class="comment-author">${comment.author}</div>
+                                        <div class="text-light small">${comment.text}</div>
+                                    </div>
+                                `;
+                            });
+                            commentsList.innerHTML = html;
+                        }
+                    });
+            }
+
+            // --- 2. FUNCTION TO SEND LIKE ---
+            function sendLike() {
+                fetch('/like', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    // Update the count immediately after clicking
+                    document.getElementById('likeCount').innerText = data.count;
+                });
+            }
+
+            // --- 3. FUNCTION TO SEND COMMENT ---
+            function sendComment(event) {
+                event.preventDefault(); // Stop page reload
+                
+                const author = document.getElementById('author').value;
+                const text = document.getElementById('commentText').value;
+                
+                const formData = new FormData();
+                formData.append('author', author);
+                formData.append('comment_text', text);
+
+                fetch('/comment', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Clear the input boxes
+                    document.getElementById('author').value = '';
+                    document.getElementById('commentText').value = '';
+                    // Force an update immediately so user sees their comment
+                    fetchUpdates();
+                });
+            }
+
+            // --- 4. START THE LIVE UPDATES ---
+            // Fetch immediately on load
+            fetchUpdates();
+            // Fetch every 2 seconds (2000 milliseconds)
+            setInterval(fetchUpdates, 2000);
+            
+        </script>
       </body>
     </html>
     '''
     
-    return render_template_string(html_content, rankings=standings_data, gif_url=gif_url, likes=current_likes, comments=all_comments)
+    return render_template_string(html_content, rankings=standings_data, gif_url=gif_url)
 
-# --- BACKEND LOGIC FOR LIKES ---
+# --- NEW API ROUTE FOR LIVE UPDATES ---
+@app.route('/api/updates')
+def get_updates():
+    likes_obj = LikeCounter.query.first()
+    likes = likes_obj.count if likes_obj else 0
+    
+    comments = Comment.query.order_by(Comment.id.desc()).all()
+    comments_list = [{'author': c.author, 'text': c.text} for c in comments]
+    
+    return jsonify({'likes': likes, 'comments': comments_list})
+
+# --- UPDATED LIKE ROUTE (Returns JSON now) ---
 @app.route('/like', methods=['POST'])
 def like_post():
     likes_obj = LikeCounter.query.first()
@@ -213,9 +264,9 @@ def like_post():
     
     likes_obj.count += 1
     db.session.commit()
-    return redirect(url_for('index'))
+    return jsonify({'count': likes_obj.count})
 
-# --- BACKEND LOGIC FOR COMMENTS ---
+# --- UPDATED COMMENT ROUTE (Returns JSON now) ---
 @app.route('/comment', methods=['POST'])
 def add_comment():
     author = request.form.get('author')
@@ -225,8 +276,8 @@ def add_comment():
         new_comment = Comment(author=author, text=text)
         db.session.add(new_comment)
         db.session.commit()
-        
-    return redirect(url_for('index'))
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
