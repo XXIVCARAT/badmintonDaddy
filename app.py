@@ -1,105 +1,118 @@
-from flask import Flask, url_for, render_template_string
+from flask import Flask, render_template_string
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    # 1. HARDCODED RANKINGS DATA
+    # 1. UPDATED PLAYERS LIST
+    # Names are in the specific order requested
     standings_data = [
-        {"rank": 1, "name": "Suhal++ Chong Wei", "points": 1250, "win_rate": "92%"},
-        {"rank": 2, "name": "Sujay Dan", "points": 1180, "win_rate": "88%"},
-        {"rank": 3, "name": "Ourab Taufik", "points": 950, "win_rate": "75%"},
-        {"rank": 4, "name": "Generic Player 1", "points": 800, "win_rate": "50%"},
+        {"rank": 1, "name": "Ourab", "elo": 1500},
+        {"rank": 2, "name": "Anuj", "elo": 1480},
+        {"rank": 3, "name": "Suhal", "elo": 1450},
+        {"rank": 4, "name": "Harshil", "elo": 1420},
+        {"rank": 5, "name": "Shreyas", "elo": 1390},
+        {"rank": 6, "name": "Chirag", "elo": 1350},
+        {"rank": 7, "name": "Nirlep", "elo": 1300},
+        {"rank": 8, "name": "Ameya", "elo": 1250},
     ]
 
-    # Video file path
-    video_url = url_for('static', filename='match_highlight.mp4')
-
-    # CHANGED: Removed 'f' from here. Now it is just a normal string.
-    # We use {{ video_url }} for Jinja to fill it in later.
+    # HTML TEMPLATE
+    # Note: This is a standard string (no 'f' at the beginning) to avoid syntax errors.
     html_content = '''
     <!doctype html>
     <html lang="en" data-bs-theme="dark">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Badminton League</title>
+        <title>Badminton Daddy</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
-            body { background-color: #1a1a1a; color: white; font-family: sans-serif; }
-            .custom-header { color: #ffcc00; text-shadow: 1px 1px 5px black; }
+            body { background-color: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            .custom-header { color: #ffcc00; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+            
+            /* Tab Styling */
             .nav-tabs .nav-link.active { background-color: #ffcc00; color: black; border-color: #ffcc00; font-weight: bold; }
-            .nav-tabs .nav-link { color: #ffcc00; }
-            .highlight-card { border: 2px solid #ffcc00; background-color: #2c2c2c; }
+            .nav-tabs .nav-link { color: #ffcc00; margin-right: 5px; border: 1px solid #333; }
+            .nav-tabs { border-bottom: 2px solid #ffcc00; }
+            
+            /* Table Styling */
+            .table-custom { border: 1px solid #444; }
+            .rank-col { color: #ffcc00; font-weight: bold; font-size: 1.2em; }
+            
+            /* Announcement Styling */
+            .wish-card { border: 4px solid #ffcc00; background-color: #2c2c2c; border-radius: 20px; box-shadow: 0 0 20px rgba(255, 204, 0, 0.3); }
+            .wish-text { font-size: 2rem; color: #fff; font-weight: bold; line-height: 1.4; }
+            .highlight-name { color: #ffcc00; text-decoration: underline; }
         </style>
       </head>
       <body>
         
         <div class="container mt-5 text-center">
-            <h1 class="mb-4 custom-header">🏸 The Badminton League 🏸</h1>
+            <h1 class="mb-5 custom-header">🏸 Badminton Daddy 🏸</h1>
 
             <ul class="nav nav-tabs justify-content-center mb-4" id="myTab" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="announcements-tab" data-bs-toggle="tab" data-bs-target="#announcements" type="button" role="tab">Announcements</button>
+                    <button class="nav-link active" id="standings-tab" data-bs-toggle="tab" data-bs-target="#standings" type="button" role="tab">Standings</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="standings-tab" data-bs-toggle="tab" data-bs-target="#standings" type="button" role="tab">Standings</button>
+                    <button class="nav-link" id="announcements-tab" data-bs-toggle="tab" data-bs-target="#announcements" type="button" role="tab">Announcements</button>
                 </li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
-                
-                <div class="tab-pane fade show active" id="announcements" role="tabpanel">
-                    <div class="alert alert-warning text-dark fw-bold fs-5" role="alert">
-                        📢 Badminton Daddy wishes Ourab all the best for his GATE exam! 🎓
-                    </div>
 
-                    <div class="card highlight-card p-3 mx-auto" style="max-width: 700px;">
-                        <h4 class="mb-3">🔥 Match of the Week 🔥</h4>
-                        <div class="ratio ratio-16x9">
-                            <video controls autoplay muted loop>
-                                <source src="{{ video_url }}" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                        <p class="mt-2 text-muted">Suhal++ vs Sujay Dan Highlights</p>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade" id="standings" role="tabpanel">
-                    <div class="table-responsive mx-auto" style="max-width: 800px;">
-                        <table class="table table-dark table-striped table-hover border-warning">
+                <div class="tab-pane fade show active" id="standings" role="tabpanel">
+                    <div class="table-responsive mx-auto" style="max-width: 600px;">
+                        <table class="table table-dark table-striped table-hover table-custom align-middle">
                             <thead>
-                                <tr style="color: #ffcc00;">
-                                    <th scope="col"># Rank</th>
-                                    <th scope="col">Player Name</th>
-                                    <th scope="col">Points</th>
-                                    <th scope="col">Win Rate</th>
+                                <tr style="border-bottom: 2px solid #ffcc00;">
+                                    <th scope="col" style="color: #ffcc00;">Rank</th>
+                                    <th scope="col" style="color: #ffcc00;">Player Name</th>
+                                    <th scope="col" style="color: #ffcc00;">Elo Rating</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for player in rankings %}
                                 <tr>
-                                    <th scope="row">{{ player.rank }}</th>
-                                    <td>{{ player.name }}</td>
-                                    <td>{{ player.points }}</td>
-                                    <td>{{ player.win_rate }}</td>
+                                    <th scope="row" class="rank-col">#{{ player.rank }}</th>
+                                    <td class="fs-5">{{ player.name }}</td>
+                                    <td class="text-warning fw-bold">{{ player.elo }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+                
+                <div class="tab-pane fade" id="announcements" role="tabpanel">
+                    <div class="container" style="max-width: 700px;">
+                        
+                        <div class="card wish-card p-5 mb-4">
+                            <p class="wish-text">
+                                Badminton Daddy wishes <br>
+                                <span class="highlight-name">Ourab</span> <br>
+                                All the Best for his <br>
+                                <span style="color: #00d4ff;">GATE Exam!</span> 🎓
+                            </p>
+                            
+                            <div class="mt-4">
+                                <img src="https://media.giphy.com/media/l41YkxvU8c7J7Bba0/giphy.gif" alt="Good Luck GIF" class="img-fluid rounded" style="border: 2px solid white; max-width: 100%;">
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
 
             </div>
         </div>
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
       </body>
     </html>
     '''
     
-    # CHANGED: We now pass video_url here
-    return render_template_string(html_content, rankings=standings_data, video_url=video_url)
+    return render_template_string(html_content, rankings=standings_data)
 
 if __name__ == '__main__':
     app.run(debug=True)
