@@ -9,11 +9,14 @@ def index():
         {"rank": 1, "name": "Ourab", "elo": 1500},
         {"rank": 2, "name": "Anuj", "elo": 1480},
         {"rank": 3, "name": "Suhal", "elo": 1450},
-        {"rank": 4, "name": "Harshil", "elo": 1420},
-        {"rank": 5, "name": "Shreyas", "elo": 1390},
-        {"rank": 6, "name": "Chirag", "elo": 1350},
-        {"rank": 7, "name": "Nirlep", "elo": 1300},
-        {"rank": 8, "name": "Ameya", "elo": 1250},
+        {"rank": 4, "name": "Sujay", "elo": 1425},
+        {"rank": 5, "name": "Harshil", "elo": 1420},
+        {"rank": 6, "name": "Shreyas", "elo": 1390},
+        {"rank": 7, "name": "Ishita", "elo": 1390},
+        {"rank": 8, "name": "Idhant", "elo": 1350},
+        {"rank": 9, "name": "Chirag", "elo": 1350},
+        {"rank": 10, "name": "Nirlep", "elo": 1300},
+        {"rank": 11, "name": "Ameya", "elo": 1250},
     ]
 
     # 2. LOAD STATIC FILES
