@@ -171,7 +171,7 @@ def index():
                     <div class="container" style="max-width: 700px;">
                         
                         <div class="card wish-card p-4 mb-4">
-                            <p class="fs-2 fw-bold text-white mb-4">Best of Luck <span class="text-warning">Ourab!</span> 🎓</p>
+                            <p class="fs-2 fw-bold text-white mb-4">Best of Luck <span class="text-warning">Ourab!</span> for his GATE Exam 🎓</p>
                             
                             <div class="mb-4">
                                 <img src="{{ gif_url }}" class="img-fluid rounded" style="max-width: 100%; border: 2px solid white;">
