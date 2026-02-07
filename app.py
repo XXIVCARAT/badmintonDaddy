@@ -31,6 +31,50 @@ with app.app_context():
         db.session.add(LikeCounter(count=0))
         db.session.commit()
 
+# --- HELPER FOR HTMX INTERACTIONS ---
+def get_interaction_html():
+    likes_obj = LikeCounter.query.first()
+    likes = likes_obj.count if likes_obj else 0
+    comments = Comment.query.order_by(Comment.id.desc()).all()
+    
+    return render_template_string('''
+        <div class="d-inline-block mb-4">
+            <button hx-post="/like" hx-swap="outerHTML" hx-target="#interaction-area" class="btn btn-like rounded-pill px-4 py-2 fw-bold">
+                <i class="fa-solid fa-heart me-2"></i> Like 
+                <span class="badge bg-warning text-dark ms-2">{{ likes }}</span>
+            </button>
+        </div>
+
+        <div class="text-start">
+            <h5 class="text-white border-bottom pb-2 mb-3">Leave a Wish</h5>
+            <form hx-post="/comment" hx-target="#interaction-area" hx-swap="outerHTML" 
+                  class="row g-2 mb-4" onsubmit="setTimeout(()=>this.reset(), 100);">
+                <div class="col-4">
+                    <input type="text" name="author" class="form-control bg-dark text-white border-secondary" placeholder="Name" required>
+                </div>
+                <div class="col-6">
+                    <input type="text" name="comment_text" class="form-control bg-dark text-white border-secondary" placeholder="Message..." required>
+                </div>
+                <div class="col-2">
+                    <button type="submit" class="btn btn-warning w-100 fw-bold">Post</button>
+                </div>
+            </form>
+
+            <div class="comments-list" style="max-height: 400px; overflow-y: auto;">
+                {% if comments|length == 0 %}
+                    <p class="text-muted fst-italic">No comments yet.</p>
+                {% else %}
+                    {% for comment in comments %}
+                    <div class="comment-box" style="background-color: #3b3b3b; border-radius: 10px; padding: 10px; margin-bottom: 10px; border-left: 4px solid #ffcc00;">
+                        <div style="color: #ffcc00; font-weight: bold; font-size: 0.9em;">{{ comment.author }}</div>
+                        <div class="text-light small">{{ comment.text }}</div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    ''', likes=likes, comments=comments)
+
 @app.route('/')
 def index():
     # 1. HARDCODED RANKINGS
@@ -50,66 +94,72 @@ def index():
 
     gif_url = url_for('static', filename='my_cool_gif.gif')
 
-    # HTML TEMPLATE WITH JAVASCRIPT
+    # HTML TEMPLATE
     html_content = '''
     <!doctype html>
     <html lang="en" data-bs-theme="dark">
       <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
         <title>Badminton Daddy</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="https://unpkg.com/htmx.org@1.9.6"></script>
         
         <style>
-            body { background-color: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            body { background-color: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; touch-action: manipulation; }
             .custom-header { color: #ffcc00; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+            
+            /* Tabs */
             .nav-tabs .nav-link.active { background-color: #ffcc00; color: black; border-color: #ffcc00; font-weight: bold; }
             .nav-tabs .nav-link { color: #ffcc00; margin-right: 5px; border: 1px solid #333; }
             .nav-tabs { border-bottom: 2px solid #ffcc00; }
-            .wish-card { border: 4px solid #ffcc00; background-color: #2c2c2c; border-radius: 20px; box-shadow: 0 0 20px rgba(255, 204, 0, 0.3); }
-            .wish-text { font-size: 2rem; color: #fff; font-weight: bold; line-height: 1.4; }
-            .highlight-name { color: #ffcc00; text-decoration: underline; }
             
-            .interaction-section { border-top: 1px solid #555; padding-top: 20px; margin-top: 20px; }
-            .btn-like { border: 2px solid #ffcc00; color: #ffcc00; background: transparent; transition: 0.3s; }
+            /* Card Styling */
+            .wish-card { border: 4px solid #ffcc00; background-color: #2c2c2c; border-radius: 20px; }
+            .btn-like { border: 2px solid #ffcc00; color: #ffcc00; background: transparent; }
             .btn-like:hover { background-color: #ffcc00; color: black; }
-            .comment-box { background-color: #3b3b3b; border-radius: 10px; padding: 10px; margin-bottom: 10px; text-align: left; border-left: 4px solid #ffcc00; }
-            .comment-author { color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 2px;}
+
+            /* --- SCOREBOARD STYLES --- */
+            .score-container { display: flex; height: 50vh; width: 100%; border: 2px solid #444; border-radius: 15px; overflow: hidden; margin-top: 20px;}
+            .team-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; transition: background 0.1s; position: relative; }
+            .team-a-bg { background-color: #2c2c2c; border-right: 1px solid #555; }
+            .team-b-bg { background-color: #252525; }
+            .team-area:active { background-color: #444; } /* Tap feedback */
+
+            .score-number { font-size: 6rem; font-weight: 800; line-height: 1; user-select: none; }
+            .team-name-input { background: transparent; border: none; color: #aaa; text-align: center; font-size: 1.5rem; width: 80%; font-weight: bold; }
+            .team-name-input:focus { outline: none; border-bottom: 2px solid #ffcc00; color: white; }
+            
+            .score-controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+            .winner-glow { box-shadow: inset 0 0 50px #00ff00 !important; border: 2px solid #00ff00 !important; }
         </style>
       </head>
       <body>
         
-        <div class="container mt-5 text-center mb-5">
-            <h1 class="mb-5 custom-header">🏸 Badminton Daddy 🏸</h1>
+        <div class="container mt-4 text-center mb-5">
+            <h1 class="mb-4 custom-header">🏸 Badminton Daddy 🏸</h1>
 
             <ul class="nav nav-tabs justify-content-center mb-4" id="myTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="standings-tab" data-bs-toggle="tab" data-bs-target="#standings" type="button" role="tab">Standings</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="announcements-tab" data-bs-toggle="tab" data-bs-target="#announcements" type="button" role="tab">Announcements</button>
-                </li>
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#standings">Standings</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#announcements">Announcements</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#scoreboard">Score Calculator</button></li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
 
-                <div class="tab-pane fade show active" id="standings" role="tabpanel">
+                <div class="tab-pane fade show active" id="standings">
                     <div class="table-responsive mx-auto" style="max-width: 600px;">
-                        <table class="table table-dark table-striped table-hover table-custom align-middle">
+                        <table class="table table-dark table-striped table-hover align-middle">
                             <thead>
                                 <tr style="border-bottom: 2px solid #ffcc00;">
-                                    <th scope="col" style="color: #ffcc00;">Rank</th>
-                                    <th scope="col" style="color: #ffcc00;">Player Name</th>
-                                    <th scope="col" style="color: #ffcc00;">Elo Rating</th>
+                                    <th class="text-warning">Rank</th><th class="text-warning">Player</th><th class="text-warning">Elo</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for player in rankings %}
                                 <tr>
-                                    <th scope="row" class="rank-col">#{{ player.rank }}</th>
-                                    <td class="fs-5">{{ player.name }}</td>
-                                    <td class="text-warning fw-bold">{{ player.elo }}</td>
+                                    <th class="text-warning">#{{ player.rank }}</th><td>{{ player.name }}</td><td class="text-warning fw-bold">{{ player.elo }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -117,167 +167,160 @@ def index():
                     </div>
                 </div>
                 
-                <div class="tab-pane fade" id="announcements" role="tabpanel">
-                    <div class="container" style="max-width: 700px;">
-                        <div class="card wish-card p-4 mb-4">
-                            <p class="wish-text">
-                                Badminton Daddy wishes <br>
-                                <span class="highlight-name">Ourab</span> <br>
-                                All the Best for his <br>
-                                <span style="color: #00d4ff;">GATE Exam!</span> 🎓
-                            </p>
-                            
-                            <div class="mt-4">
-                                <img src="{{ gif_url }}" alt="Good Luck GIF" class="img-fluid rounded" style="border: 2px solid white; max-width: 100%;">
-                            </div>
+                <div class="tab-pane fade" id="announcements">
+                    <div class="card wish-card p-4 mx-auto" style="max-width: 700px;">
+                        
+                        <p class="fs-2 fw-bold text-white mb-2">Best of Luck <span class="text-warning">Ourab!</span> 🎓</p>
+                        
+                        <div class="alert alert-dark border-warning d-inline-block py-2 px-4 mb-4" style="border-radius: 50px;">
+                            <i class="fa-solid fa-calculator text-warning me-2"></i>
+                            <span class="small">New: Use the <strong>Score Calculator</strong> tab to track games!</span>
+                        </div>
 
-                            <div class="interaction-section">
-                                
-                                <div class="d-inline-block mb-4">
-                                    <button id="likeBtn" class="btn btn-like rounded-pill px-4 py-2 fw-bold" onclick="sendLike()">
-                                        <i class="fa-solid fa-heart me-2"></i> Likes 
-                                        <span id="likeCount" class="badge bg-warning text-dark ms-2">Loading...</span>
-                                    </button>
-                                </div>
+                        <div class="mb-4">
+                            <img src="{{ gif_url }}" class="img-fluid rounded" style="max-width: 100%; border: 2px solid white;">
+                        </div>
 
-                                <div class="text-start">
-                                    <h5 class="text-white border-bottom pb-2 mb-3">Leave a Wish</h5>
-                                    <form id="commentForm" onsubmit="sendComment(event)" class="row g-2 mb-4">
-                                        <div class="col-4">
-                                            <input type="text" id="author" class="form-control bg-dark text-white border-secondary" placeholder="Your Name" required>
-                                        </div>
-                                        <div class="col-6">
-                                            <input type="text" id="commentText" class="form-control bg-dark text-white border-secondary" placeholder="Write something nice..." required>
-                                        </div>
-                                        <div class="col-2">
-                                            <button type="submit" class="btn btn-warning w-100 fw-bold">Post</button>
-                                        </div>
-                                    </form>
-
-                                    <div id="commentsList" class="comments-list" style="max-height: 400px; overflow-y: auto;">
-                                        <p class="text-muted fst-italic">Loading comments...</p>
-                                    </div>
-                                </div>
-                            </div>
+                        <div id="interaction-area" hx-get="/updates" hx-trigger="every 2s" hx-swap="innerHTML">
+                             {{ interaction_html|safe }}
                         </div>
                     </div>
                 </div>
+
+                <div class="tab-pane fade" id="scoreboard">
+                    <div class="container" style="max-width: 800px;">
+                        
+                        <div class="alert alert-secondary p-2 mb-3 small">
+                            <i class="fa-solid fa-circle-info"></i> Tap huge colored areas to add points. Refresh page to reset.
+                        </div>
+
+                        <div class="score-container">
+                            <div id="areaA" class="team-area team-a-bg" onclick="addPoint('A')">
+                                <input type="text" value="Team A" class="team-name-input" onclick="event.stopPropagation()">
+                                <div id="scoreA" class="score-number text-white">0</div>
+                            </div>
+                            
+                            <div id="areaB" class="team-area team-b-bg" onclick="addPoint('B')">
+                                <input type="text" value="Team B" class="team-name-input" onclick="event.stopPropagation()">
+                                <div id="scoreB" class="score-number text-warning">0</div>
+                            </div>
+                        </div>
+
+                        <div class="score-controls">
+                            <button class="btn btn-secondary" onclick="undoPoint()"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+                            <button class="btn btn-outline-warning" onclick="swapSides()"><i class="fa-solid fa-arrow-right-arrow-left"></i> Swap</button>
+                            <button class="btn btn-danger" onclick="resetScore()"><i class="fa-solid fa-trash"></i> Reset</button>
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        
         <script>
-            // --- 1. FUNCTION TO FETCH UPDATES (The Live Part) ---
-            function fetchUpdates() {
-                fetch('/api/updates')
-                    .then(response => response.json())
-                    .then(data => {
-                        // Update Like Count
-                        document.getElementById('likeCount').innerText = data.likes;
-                        
-                        // Update Comments List
-                        const commentsList = document.getElementById('commentsList');
-                        if (data.comments.length === 0) {
-                            commentsList.innerHTML = '<p class="text-muted fst-italic">No comments yet. Be the first!</p>';
-                        } else {
-                            let html = '';
-                            data.comments.forEach(comment => {
-                                html += `
-                                    <div class="comment-box">
-                                        <div class="comment-author">${comment.author}</div>
-                                        <div class="text-light small">${comment.text}</div>
-                                    </div>
-                                `;
-                            });
-                            commentsList.innerHTML = html;
-                        }
-                    });
+            // --- BADMINTON SCOREBOARD LOGIC ---
+            let scoreA = 0;
+            let scoreB = 0;
+            let historyStack = []; // To store history for Undo
+
+            function updateDisplay() {
+                const elA = document.getElementById('scoreA');
+                const elB = document.getElementById('scoreB');
+                const areaA = document.getElementById('areaA');
+                const areaB = document.getElementById('areaB');
+
+                elA.innerText = scoreA;
+                elB.innerText = scoreB;
+
+                // Visual Winner Logic (Green glow if >20 and ahead by 2)
+                areaA.classList.remove('winner-glow');
+                areaB.classList.remove('winner-glow');
+
+                // Standard Badminton Rules: Win at 21 (must lead by 2), Hard cap at 30
+                let winner = null;
+                if (scoreA >= 21 && scoreA >= scoreB + 2) winner = 'A';
+                if (scoreB >= 21 && scoreB >= scoreA + 2) winner = 'B';
+                if (scoreA === 30) winner = 'A';
+                if (scoreB === 30) winner = 'B';
+
+                if (winner === 'A') areaA.classList.add('winner-glow');
+                if (winner === 'B') areaB.classList.add('winner-glow');
             }
 
-            // --- 2. FUNCTION TO SEND LIKE ---
-            function sendLike() {
-                fetch('/like', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    // Update the count immediately after clicking
-                    document.getElementById('likeCount').innerText = data.count;
-                });
+            function addPoint(team) {
+                // Save state for undo
+                historyStack.push({ A: scoreA, B: scoreB });
+
+                if (team === 'A') scoreA++;
+                else scoreB++;
+
+                // Haptic Feedback (Vibration)
+                if (navigator.vibrate) navigator.vibrate(50); 
+
+                updateDisplay();
             }
 
-            // --- 3. FUNCTION TO SEND COMMENT ---
-            function sendComment(event) {
-                event.preventDefault(); // Stop page reload
+            function undoPoint() {
+                if (historyStack.length > 0) {
+                    const lastState = historyStack.pop();
+                    scoreA = lastState.A;
+                    scoreB = lastState.B;
+                    updateDisplay();
+                }
+            }
+
+            function resetScore() {
+                if(confirm("Start a new game?")) {
+                    scoreA = 0;
+                    scoreB = 0;
+                    historyStack = [];
+                    updateDisplay();
+                }
+            }
+
+            function swapSides() {
+                // Swap scores
+                let tempScore = scoreA;
+                scoreA = scoreB;
+                scoreB = tempScore;
                 
-                const author = document.getElementById('author').value;
-                const text = document.getElementById('commentText').value;
-                
-                const formData = new FormData();
-                formData.append('author', author);
-                formData.append('comment_text', text);
+                // Swap Names in Inputs
+                const inputs = document.querySelectorAll('.team-name-input');
+                let tempName = inputs[0].value;
+                inputs[0].value = inputs[1].value;
+                inputs[1].value = tempName;
 
-                fetch('/comment', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // Clear the input boxes
-                    document.getElementById('author').value = '';
-                    document.getElementById('commentText').value = '';
-                    // Force an update immediately so user sees their comment
-                    fetchUpdates();
-                });
+                updateDisplay();
             }
-
-            // --- 4. START THE LIVE UPDATES ---
-            // Fetch immediately on load
-            fetchUpdates();
-            // Fetch every 2 seconds (2000 milliseconds)
-            setInterval(fetchUpdates, 2000);
-            
         </script>
       </body>
     </html>
     '''
     
-    return render_template_string(html_content, rankings=standings_data, gif_url=gif_url)
+    return render_template_string(html_content, rankings=standings_data, gif_url=gif_url, interaction_html=get_interaction_html())
 
-# --- NEW API ROUTE FOR LIVE UPDATES ---
-@app.route('/api/updates')
-def get_updates():
-    likes_obj = LikeCounter.query.first()
-    likes = likes_obj.count if likes_obj else 0
-    
-    comments = Comment.query.order_by(Comment.id.desc()).all()
-    comments_list = [{'author': c.author, 'text': c.text} for c in comments]
-    
-    return jsonify({'likes': likes, 'comments': comments_list})
+# --- ROUTES ---
+@app.route('/updates')
+def updates(): return get_interaction_html()
 
-# --- UPDATED LIKE ROUTE (Returns JSON now) ---
 @app.route('/like', methods=['POST'])
-def like_post():
+def like():
     likes_obj = LikeCounter.query.first()
-    if not likes_obj:
+    if not likes_obj: # Safety check
         likes_obj = LikeCounter(count=0)
         db.session.add(likes_obj)
-    
     likes_obj.count += 1
     db.session.commit()
-    return jsonify({'count': likes_obj.count})
+    return get_interaction_html()
 
-# --- UPDATED COMMENT ROUTE (Returns JSON now) ---
 @app.route('/comment', methods=['POST'])
-def add_comment():
-    author = request.form.get('author')
-    text = request.form.get('comment_text')
-    
-    if author and text:
-        new_comment = Comment(author=author, text=text)
-        db.session.add(new_comment)
+def comment():
+    if request.form.get('author') and request.form.get('comment_text'):
+        db.session.add(Comment(author=request.form['author'], text=request.form['comment_text']))
         db.session.commit()
-        return jsonify({'status': 'success'})
-    return jsonify({'status': 'error'}), 400
+    return get_interaction_html()
 
 if __name__ == '__main__':
     app.run(debug=True)
