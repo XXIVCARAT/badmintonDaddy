@@ -143,7 +143,7 @@ def index():
             <ul class="nav nav-tabs justify-content-center mb-4" id="myTab" role="tablist">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#standings">Standings</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#announcements">Announcements</button></li>
-                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#scoreboard">Score Calculator</button></li>
+                <li class="nav-item"><button class="nav-link" id="score-tab-btn" data-bs-toggle="tab" data-bs-target="#scoreboard">Score Calculator</button></li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
@@ -168,22 +168,34 @@ def index():
                 </div>
                 
                 <div class="tab-pane fade" id="announcements">
-                    <div class="card wish-card p-4 mx-auto" style="max-width: 700px;">
+                    <div class="container" style="max-width: 700px;">
                         
-                        <p class="fs-2 fw-bold text-white mb-2">Best of Luck <span class="text-warning">Ourab!</span> 🎓</p>
-                        
-                        <div class="alert alert-dark border-warning d-inline-block py-2 px-4 mb-4" style="border-radius: 50px;">
-                            <i class="fa-solid fa-calculator text-warning me-2"></i>
-                            <span class="small">New: Use the <strong>Score Calculator</strong> tab to track games!</span>
+                        <div class="card wish-card p-4 mb-4">
+                            <p class="fs-2 fw-bold text-white mb-4">Best of Luck <span class="text-warning">Ourab!</span> 🎓</p>
+                            
+                            <div class="mb-4">
+                                <img src="{{ gif_url }}" class="img-fluid rounded" style="max-width: 100%; border: 2px solid white;">
+                            </div>
+
+                            <div id="interaction-area" hx-get="/updates" hx-trigger="every 2s" hx-swap="innerHTML">
+                                 {{ interaction_html|safe }}
+                            </div>
                         </div>
 
-                        <div class="mb-4">
-                            <img src="{{ gif_url }}" class="img-fluid rounded" style="max-width: 100%; border: 2px solid white;">
+                        <div class="card wish-card p-4 mb-4 text-start">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="fa-solid fa-bullhorn text-warning fs-3 me-3"></i>
+                                <h4 class="text-white m-0 fw-bold">Update: Score Calculator</h4>
+                            </div>
+                            <p class="text-light">
+                                No more fighting over the score! We have added a <strong>Live Score Calculator</strong>. 
+                                It works without internet and features big tap zones for referees.
+                            </p>
+                            <button onclick="document.getElementById('score-tab-btn').click()" class="btn btn-outline-warning w-100 fw-bold">
+                                <i class="fa-solid fa-calculator me-2"></i> Try Scoreboard Now
+                            </button>
                         </div>
 
-                        <div id="interaction-area" hx-get="/updates" hx-trigger="every 2s" hx-swap="innerHTML">
-                             {{ interaction_html|safe }}
-                        </div>
                     </div>
                 </div>
 
@@ -223,7 +235,7 @@ def index():
             // --- BADMINTON SCOREBOARD LOGIC ---
             let scoreA = 0;
             let scoreB = 0;
-            let historyStack = []; // To store history for Undo
+            let historyStack = [];
 
             function updateDisplay() {
                 const elA = document.getElementById('scoreA');
@@ -234,11 +246,9 @@ def index():
                 elA.innerText = scoreA;
                 elB.innerText = scoreB;
 
-                // Visual Winner Logic (Green glow if >20 and ahead by 2)
                 areaA.classList.remove('winner-glow');
                 areaB.classList.remove('winner-glow');
 
-                // Standard Badminton Rules: Win at 21 (must lead by 2), Hard cap at 30
                 let winner = null;
                 if (scoreA >= 21 && scoreA >= scoreB + 2) winner = 'A';
                 if (scoreB >= 21 && scoreB >= scoreA + 2) winner = 'B';
@@ -250,15 +260,9 @@ def index():
             }
 
             function addPoint(team) {
-                // Save state for undo
                 historyStack.push({ A: scoreA, B: scoreB });
-
-                if (team === 'A') scoreA++;
-                else scoreB++;
-
-                // Haptic Feedback (Vibration)
+                if (team === 'A') scoreA++; else scoreB++;
                 if (navigator.vibrate) navigator.vibrate(50); 
-
                 updateDisplay();
             }
 
@@ -273,25 +277,14 @@ def index():
 
             function resetScore() {
                 if(confirm("Start a new game?")) {
-                    scoreA = 0;
-                    scoreB = 0;
-                    historyStack = [];
-                    updateDisplay();
+                    scoreA = 0; scoreB = 0; historyStack = []; updateDisplay();
                 }
             }
 
             function swapSides() {
-                // Swap scores
-                let tempScore = scoreA;
-                scoreA = scoreB;
-                scoreB = tempScore;
-                
-                // Swap Names in Inputs
+                let tempScore = scoreA; scoreA = scoreB; scoreB = tempScore;
                 const inputs = document.querySelectorAll('.team-name-input');
-                let tempName = inputs[0].value;
-                inputs[0].value = inputs[1].value;
-                inputs[1].value = tempName;
-
+                let tempName = inputs[0].value; inputs[0].value = inputs[1].value; inputs[1].value = tempName;
                 updateDisplay();
             }
         </script>
@@ -308,9 +301,7 @@ def updates(): return get_interaction_html()
 @app.route('/like', methods=['POST'])
 def like():
     likes_obj = LikeCounter.query.first()
-    if not likes_obj: # Safety check
-        likes_obj = LikeCounter(count=0)
-        db.session.add(likes_obj)
+    if not likes_obj: likes_obj = LikeCounter(count=0); db.session.add(likes_obj)
     likes_obj.count += 1
     db.session.commit()
     return get_interaction_html()
