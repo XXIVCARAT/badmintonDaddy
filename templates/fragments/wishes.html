@@ -1,0 +1,31 @@
+{# Wishes / Announcements Tab #}
+<div class="container" style="max-width: 600px;">
+    <div class="card wish-card p-3 mb-4">
+        <h4 class="text-white mb-3">Best of Luck <span class="text-warning">Ourab!</span> 🎓</h4>
+        <div class="mb-3">
+            <img src="{{ gif_url }}" class="img-fluid rounded" style="max-width: 100%; border: 1px solid white;">
+        </div>
+
+        <div class="d-inline-block mb-3" hx-get="/update-likes" hx-trigger="every 5s" hx-swap="innerHTML">
+            {{ like_html|safe }}
+        </div>
+
+        <div class="text-start mt-2">
+            <h6 class="text-secondary border-bottom pb-2 mb-2">Leave a Wish</h6>
+            <form hx-post="/comment" hx-target="#comments-list" hx-swap="outerHTML" class="row g-2 mb-3" onsubmit="setTimeout(()=>this.reset(), 100);">
+                <div class="col-4">
+                    <input type="text" name="author" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Name" required>
+                </div>
+                <div class="col-6">
+                    <input type="text" name="comment_text" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Message..." required>
+                </div>
+                <div class="col-2">
+                    <button type="submit" class="btn btn-sm btn-warning w-100 fw-bold">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+            {{ comments_html|safe }}
+        </div>
+    </div>
+</div>

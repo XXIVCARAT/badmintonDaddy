@@ -1,0 +1,5 @@
+{# Likes button fragment - updated via HTMX #}
+<button id="like-btn" hx-post="/like" hx-swap="outerHTML" class="btn btn-outline-warning rounded-pill px-4 py-2 fw-bold">
+    <i class="fa-solid fa-heart me-2"></i> Like
+    <span class="badge bg-warning text-dark ms-2">{{ likes }}</span>
+</button>

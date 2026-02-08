@@ -1,0 +1,28 @@
+{# Manual Match Entry Tab #}
+<div class="container" style="max-width: 600px;">
+    <div class="card bg-dark border-warning p-3">
+        <h5 class="text-warning mb-3">Quick Result Entry</h5>
+        
+        <label class="text-success fw-bold small">Winners</label>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <input type="text" id="manual-w1" class="form-control form-control-sm" placeholder="Winner 1" list="pList">
+            </div>
+            <div class="col-6">
+                <input type="text" id="manual-w2" class="form-control form-control-sm" placeholder="Winner 2 (Opt)" list="pList">
+            </div>
+        </div>
+        
+        <label class="text-danger fw-bold small">Losers</label>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <input type="text" id="manual-l1" class="form-control form-control-sm" placeholder="Loser 1" list="pList">
+            </div>
+            <div class="col-6">
+                <input type="text" id="manual-l2" class="form-control form-control-sm" placeholder="Loser 2 (Opt)" list="pList">
+            </div>
+        </div>
+        
+        <button class="btn btn-warning w-100 fw-bold" onclick="submitManualMatch()">Submit Result</button>
+    </div>
+</div>
