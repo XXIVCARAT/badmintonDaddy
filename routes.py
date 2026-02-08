@@ -3,6 +3,12 @@ Routes and views for Badminton Daddy application.
 """
 from flask import Blueprint, render_template, request, jsonify, url_for
 from models import db, Player, MatchHistory, LikeCounter, Comment
+from errors import success_response, error_response, ValidationError, NotFoundError, DatabaseError
+from validators import Validator, MatchValidator
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 # Create blueprints
@@ -118,51 +124,76 @@ def save_match():
         "type": "singles" or "doubles"
     }
     """
-    data = request.json
-    winners = data.get('winners', [])
-    losers = data.get('losers', [])
-    match_type = data.get('type', 'singles')
-    
-    if not winners or not losers:
-        return jsonify({'status': 'error', 'message': 'Missing winners or losers'}), 400
-    
-    is_doubles = match_type == 'doubles'
-    
-    # Update winners
-    for name in winners:
-        player = Player.query.filter_by(name=name).first()
-        if not player:
-            player = Player(name=name)
-            db.session.add(player)
+    try:
+        data = request.json
+        if not data:
+            return error_response("Request body must be JSON", 400)
         
-        if is_doubles:
-            player.doubles_won += 1
-            player.doubles_played += 1
-        else:
-            player.singles_won += 1
-            player.singles_played += 1
-    
-    # Update losers
-    for name in losers:
-        player = Player.query.filter_by(name=name).first()
-        if not player:
-            player = Player(name=name)
-            db.session.add(player)
+        winners = data.get('winners', [])
+        losers = data.get('losers', [])
+        match_type = data.get('type', 'singles')
         
-        if is_doubles:
-            player.doubles_lost += 1
-            player.doubles_played += 1
-        else:
-            player.singles_lost += 1
-            player.singles_played += 1
+        # Validate match data
+        winners, losers, match_type = MatchValidator.validate_match_data(
+            winners, losers, match_type
+        )
+        
+        is_doubles = match_type == 'doubles'
+        
+        # Update winners
+        for name in winners:
+            player = Player.query.filter_by(name=name).first()
+            if not player:
+                player = Player(name=name)
+                db.session.add(player)
+            
+            if is_doubles:
+                player.doubles_won += 1
+                player.doubles_played += 1
+            else:
+                player.singles_won += 1
+                player.singles_played += 1
+        
+        # Update losers
+        for name in losers:
+            player = Player.query.filter_by(name=name).first()
+            if not player:
+                player = Player(name=name)
+                db.session.add(player)
+            
+            if is_doubles:
+                player.doubles_lost += 1
+                player.doubles_played += 1
+            else:
+                player.singles_lost += 1
+                player.singles_played += 1
+        
+        # Record match history
+        match_record = MatchHistory(
+            winner_names=",".join(winners),
+            loser_names=",".join(losers),
+            match_type='Doubles' if is_doubles else 'Singles'
+        )
+        db.session.add(match_record)
+        db.session.commit()
+        
+        logger.info(f"Match saved: {match_type.upper()} - Winners: {winners}, Losers: {losers}")
+        
+        return success_response(
+            {
+                'match_id': match_record.id,
+                'winners': winners,
+                'losers': losers,
+                'type': match_type
+            },
+            message="Match saved successfully",
+            code=201
+        )
     
-    # Record match history
-    match_record = MatchHistory(
-        winner_names=",".join(winners),
-        loser_names=",".join(losers),
-        match_type='Doubles' if is_doubles else 'Singles'
-    )
-    db.session.add(match_record)
-    db.session.commit()
+    except ValidationError as e:
+        logger.warning(f"Validation error: {e.message}")
+        return error_response(e.message, e.status_code, e.data)
     
-    return jsonify({'status': 'success', 'message': 'Match saved successfully'})
+    except Exception as e:
+        logger.error(f"Error saving match: {str(e)}")
+        return error_response("Failed to save match", 500)
