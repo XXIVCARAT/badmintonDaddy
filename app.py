@@ -58,6 +58,10 @@ def run_migrations():
     """
     with app.app_context():
         inspector = db.inspect(db.engine)
+        # Check if table exists first
+        if not inspector.has_table('player'):
+            return
+
         columns = [c['name'] for c in inspector.get_columns('player')]
         
         # List of new columns to check/add
@@ -90,7 +94,12 @@ def init_db():
                 "Shreyas", "Ishita", "Idhant", "Chirag", "Nirlep", "Ameya"
             ]
             for name in initial_players:
-                db.session.add(Player(name=name))
+                # Initialize explicitly with 0s to avoid NoneType errors
+                db.session.add(Player(
+                    name=name,
+                    singles_played=0, singles_won=0, singles_lost=0,
+                    doubles_played=0, doubles_won=0, doubles_lost=0
+                ))
             
             # Init Likes
             if not LikeCounter.query.first():
@@ -198,7 +207,12 @@ def get_comments_html():
 def index():
     players = Player.query.order_by(Player.name).all()
     player_names = [p.name for p in players]
-    gif_url = url_for('static', filename='my_cool_gif.gif')
+    # NOTE: You need a gif in a static folder, or change this to an external URL
+    gif_url = url_for('static', filename='my_cool_gif.gif') 
+    
+    # Fallback if static file not found, use a placeholder
+    if not os.path.exists(os.path.join(app.root_path, 'static', 'my_cool_gif.gif')):
+        gif_url = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDdtY254YmF5eW52YmF5eW52YmF5eW52YmF5eW52YmF5eW52eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfPHwSHaTu/giphy.gif"
 
     html_content = '''
     <!doctype html>
@@ -519,7 +533,19 @@ def index():
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ winners, losers, type })
-                }).then(r => r.json()).then(d => { alert("Match Saved!"); window.location.reload(); });
+                })
+                .then(response => {
+                    if (!response.ok) { throw new Error("Network response was not ok"); }
+                    return response.json();
+                })
+                .then(d => { 
+                    alert("Match Saved!"); 
+                    window.location.reload(); 
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert("Failed to save match. Check console.");
+                });
             }
         </script>
       </body>
@@ -546,8 +572,9 @@ def r_comments(): return get_comments_html()
 @app.route('/like', methods=['POST'])
 def like():
     l = LikeCounter.query.first()
-    l.count += 1
-    db.session.commit()
+    if l:
+        l.count += 1
+        db.session.commit()
     return get_likes_html()
 
 @app.route('/comment', methods=['POST'])
@@ -557,22 +584,32 @@ def comment():
         db.session.commit()
     return get_comments_html()
 
+# --- FIXED SAVE MATCH ROUTE ---
 @app.route('/save_match', methods=['POST'])
 def save_match():
     data = request.json
     winners = data.get('winners', [])
     losers = data.get('losers', [])
+    match_type = data.get('type', 'singles')
     
-    # Check if Doubles or Singles based on number of winners
-    is_doubles = len(winners) > 1 or len(losers) > 1
-    match_type = 'Doubles' if is_doubles else 'Singles'
+    # Determine if double or singles from input or data length
+    is_doubles = (match_type == 'doubles') or (len(winners) > 1) or (len(losers) > 1)
+
+    # HELPER: Get player or create with explicit zeroed stats
+    def get_or_create_player(name):
+        p = Player.query.filter_by(name=name).first()
+        if not p:
+            p = Player(
+                name=name,
+                singles_played=0, singles_won=0, singles_lost=0,
+                doubles_played=0, doubles_won=0, doubles_lost=0
+            )
+            db.session.add(p)
+        return p
 
     # Update Winners
     for name in winners:
-        p = Player.query.filter_by(name=name).first()
-        if not p:
-            p = Player(name=name); db.session.add(p)
-        
+        p = get_or_create_player(name)
         if is_doubles:
             p.doubles_won += 1
             p.doubles_played += 1
@@ -582,10 +619,7 @@ def save_match():
             
     # Update Losers
     for name in losers:
-        p = Player.query.filter_by(name=name).first()
-        if not p:
-            p = Player(name=name); db.session.add(p)
-            
+        p = get_or_create_player(name)
         if is_doubles:
             p.doubles_lost += 1
             p.doubles_played += 1
@@ -593,9 +627,26 @@ def save_match():
             p.singles_lost += 1
             p.singles_played += 1
             
-    db.session.add(MatchHistory(winner_names=",".join(winners), loser_names=",".join(losers), match_type=match_type))
-    db.session.commit()
-    return jsonify({'status': 'success'})
+    # Record History
+    w_str = ",".join(winners)
+    l_str = ",".join(losers)
+    
+    # Add history entry
+    hist = MatchHistory(
+        winner_names=w_str, 
+        loser_names=l_str, 
+        match_type=match_type,
+        score="Manual" # No score in manual entry, use placeholder
+    )
+    db.session.add(hist)
+    
+    try:
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
